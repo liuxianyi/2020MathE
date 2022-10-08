@@ -36,7 +36,15 @@ def create_inout_sequences(input_data, tw):
     for i in range(L-tw):
         train_seq = input_data[i:i+tw]
         train_label = input_data[i+tw:i+tw+1]
-        inout_seq.append((train_seq ,train_label))
+        inout_seq.append([*train_seq ,*train_label])
+    return inout_seq
+
+def create_inout_sequences_valid(input_data, tw):
+    inout_seq = []
+    L = len(input_data)
+    for i in range(L-tw+1):
+        train_seq = input_data[i:i+tw]
+        inout_seq.append(train_seq)
     return inout_seq
 
 if __name__ == "__main__":
@@ -174,15 +182,25 @@ if __name__ == "__main__":
             df_mean['year'] = df_mean.loc[:, 'year'].astype(str).apply(pd.to_datetime)
             df_dict = {}
             for name in ["SOC土壤有机碳", "SIC土壤无机碳", "STC土壤全碳", "全氮N",	"土壤C/N比"]:
-                y = df_mean[name].values
+                y_ori = df_mean[name].values
+                lam1 = np.linspace(0, 8, 5)
+                lam2 = np.linspace(0, 8, 9)
+                print(lam2)
+                print(lam1)
+
+                y_ori = np.interp(lam2, lam1, y_ori)
+                print(y_ori)
                 #======================时序预测=========================
-                y_train = create_inout_sequences(y, tw=3)
-                print(y_train)
-                x = range(y.shape[0])
-                pre_x = range(y.shape[0]+1)
+                y_train = create_inout_sequences(y_ori, tw=3)
+                pre_x = np.array(create_inout_sequences_valid(y_ori, tw=3))
+                data = np.array(y_train)
+                x = data[:, 0:3]
+                y = data[:, 3]
+                
+                print(pre_x)
                 print("#=============模型===================")
                 if Config.sk_method == "SVR":
-                    model = SVR(kernel='rbf', C=1e3, degree=6, max_iter=10, tol=1e-4)
+                    model = SVR(kernel='rbf', C=1e2, degree=6, max_iter=10, tol=2e-1)
                 elif Config.sk_method == "KRR":
                     model = KernelRidge(kernel="rbf", alpha=1e-1)
                 elif Config.sk_method == "MLP":
@@ -204,23 +222,31 @@ if __name__ == "__main__":
                     model = StackingRegressor(estimators=estimators, final_estimator=SVR(kernel='rbf', C=1e3, degree=6, max_iter=10, tol=1e-4))
 
 
-                model.fit(np.array(x).reshape((-1, 1)), y)
-                pre_y = model.predict(np.array(pre_x).reshape(-1, 1))
+                model.fit(x, y)
+                pre_y = model.predict(pre_x)
 
                 print("#=============验证===================")
-                model.fit(np.array(x).reshape((-1, 1))[:-1], y[:-1])
-                valid_y = model.predict(np.array(x).reshape(-1, 1))
+                if Config.sk_valid:
+                    model.fit(x[:-2], y[:-2])
+                    valid_y = model.predict(x)
 
                 print("#=============绘图===================")
                 plt.figure()
                 year = sorted(list(set(df['year'].values)))
-                x_axis = year + [2022]
-                plt.scatter(year, y, label="origin")
-                plt.plot(year, valid_y, linewidth=0.8, label="valid")
+                year = [2012, 2013, 2014, 2015, 2016, 2017, 2018, 2019, 2020]
+                x_axis = [2015, 2016, 2017, 2018, 2019, 2020, 2021]
+
                 plt.plot(x_axis, pre_y, linewidth=0.8, label="predit")
+                plt.plot(year, y_ori, "o:",linewidth=0.8, label="origin", )
+                # plt.scatter(year, y_ori, label="origin")
+                if Config.sk_valid:
+                    x_valid = [2015, 2016, 2017, 2018, 2019, 2020]
+                    plt.plot(x_valid, valid_y, linewidth=0.8, label="valid")
+                
                 plt.legend()
                 plt.xlabel("year")
                 plt.ylabel(name)
+                plt.xticks([2012, 2014, 2016, 2018, 2020, 2022])
                 plt.title("{}:year与{}关系图".format(key, name))
 
                 print("#=============保存绘图===================")
@@ -232,24 +258,26 @@ if __name__ == "__main__":
                 
 
                 print("#=============评价===================")
-                mae = mean_absolute_error(y, valid_y)
-                mse = mean_squared_error(y, valid_y)
-                msle = mean_squared_log_error(y, valid_y)
-                mape = mean_absolute_percentage_error(y, valid_y)
-                med_ae = median_absolute_error(y, valid_y)
-                evs = explained_variance_score(y, valid_y)
-                r2 = r2_score(y, valid_y)
+                if Config.sk_valid:
+                    mae = mean_absolute_error(y, valid_y)
+                    mse = mean_squared_error(y, valid_y)
+                    msle = mean_squared_log_error(y, valid_y)
+                    mape = mean_absolute_percentage_error(y, valid_y)
+                    med_ae = median_absolute_error(y, valid_y)
+                    evs = explained_variance_score(y, valid_y)
+                    r2 = r2_score(y, valid_y)
                 print("#=============保存===================")
                 df_dict["year"] = x_axis
                 df_dict[name] = pre_y
-
-                df_dict['mae_'+name] = mae
-                df_dict['mse_'+name] = mse
-                df_dict['msle_'+name] = msle
-                df_dict['mape_'+name] = mape
-                df_dict['med_ae_'+name] = med_ae
-                df_dict['evs_'+name] = evs
-                df_dict['r2_'+name] = r2
+                if Config.sk_valid:
+                    df_dict['mae_'+name] = mae
+                    df_dict['mse_'+name] = mse
+                    df_dict['msle_'+name] = msle
+                    df_dict['mape_'+name] = mape
+                    df_dict['med_ae_'+name] = med_ae
+                    df_dict['evs_'+name] = evs
+                    df_dict['r2_'+name] = r2
+                # print(df_dict)
                 if Config.sk_mode == "debug":
                     break
             if Config.sk_mode == "debug":
