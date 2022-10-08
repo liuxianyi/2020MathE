@@ -1,14 +1,13 @@
-from base64 import encode
 import pandas as pd
 import os
 
-from tokenizers import Encoding
 from config import Config
 import numpy as np
 
 if __name__ == "__main__":
     attachment3 = Config.attachment3
     attachment4 = Config.attachment4
+    attachment5 = Config.attachment5
     attachment6 = Config.attachment6
     attachment7 = Config.attachment7
     attachment8s = Config.attachment8s
@@ -26,6 +25,27 @@ if __name__ == "__main__":
         data4 = pd.read_excel(attachment4)
         data4.loc[:, '日期'] = data4.loc[:, '年份'].astype(str) + data4.loc[:, '月份'].apply(lambda x: "{:0>2}".format(x))
         data4.drop(columns = ['经度(lon)', '纬度(lat)', '月份', '年份'], inplace=True)
+
+
+    if Config.isAttachment5:
+        data5 = []
+        for year in range(2020, 2023):
+            data5_ = pd.read_excel(os.path.join(attachment5, "{}绿植覆盖率.xls".format(year)), usecols=['绿植覆盖率', '时间'])
+            data5.append(data5_)
+        data5 = pd.concat(data5, axis=0)
+        data5.loc[:, '日期'] = data5.loc[:, '时间'].apply(pd.to_datetime)
+        data5.sort_values(by='日期', inplace=True)
+        data5.reset_index(inplace=True, drop=True)
+
+        for idx, rows in enumerate(data5.iterrows()):
+            if pd.isna(rows[1]["绿植覆盖率"]):
+                print(rows[0])
+                print(data5.loc[range(rows[0]-4, rows[0]), :].mean())
+                data5.loc[rows[0], "绿植覆盖率"]= data5.loc[range(rows[0]-4, rows[0]), "绿植覆盖率"].mean()
+                # data5.loc[rows[0], :].fillna(data5.loc[range(rows[0]-4, rows[0]), :].mean(), inplace=True)
+        data5["日期"] = data5["日期"].apply(lambda x: "".join(str(x).split('-')[0:2]))
+        data5 = pd.DataFrame(data5[["日期", "绿植覆盖率"]].groupby("日期").agg({"绿植覆盖率": np.mean}))
+        data5.to_csv("data5.csv")
 
 
 
@@ -90,7 +110,7 @@ if __name__ == "__main__":
         data = data.merge(data9, how='outer', on='日期')
         data = data.merge(data10, how='outer', on='日期')
         data = data.merge(data8, how='outer', on='日期')
-
+        data = data.merge(data5, how='outer', on='日期')
 
         new_data7 = pd.DataFrame(np.repeat(data7.values, data.shape[0], axis=0), columns=data7.columns)
         data = pd.concat([data, new_data7], axis=1)
@@ -99,6 +119,9 @@ if __name__ == "__main__":
         data.sort_index(inplace=True)
         data.to_csv("tmp.csv")
         data.to_excel("tmp.xlsx")
+
+        
+        
 
 
 
