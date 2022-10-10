@@ -5,7 +5,7 @@ code/*.csv
 __pycache__
 code/*.xlsx
 code/*.ttf
-train_data/
+train_data/*
 *.sh
 *.zip
 /data/基本数据/附件2、锡林郭勒统计年鉴（2016-2021）
