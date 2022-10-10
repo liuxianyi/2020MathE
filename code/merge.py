@@ -1,8 +1,10 @@
+from cProfile import label
 import pandas as pd
 import os
 
 from config import Config
 import numpy as np
+from matplotlib import pyplot as plt
 
 if __name__ == "__main__":
     attachment3 = Config.attachment3
@@ -37,16 +39,41 @@ if __name__ == "__main__":
         data5.sort_values(by='日期', inplace=True)
         data5.reset_index(inplace=True, drop=True)
 
+        # 可视化趋势
+        data5_visual = data5
+        data5_visual.dropna(inplace=True)
+        # fig, ax = plt.subplot(111)
+        plt.figure()
+        print(1111,data5_visual['绿植覆盖率'].values)
+        plt.scatter(data5["日期"], data5_visual['绿植覆盖率'].values, label="原始")
+        plt.plot(data5["日期"], data5_visual['绿植覆盖率'].values, 'r:', label="补全后")
+        plt.title("绿植覆盖率时间关系")
+        plt.xlabel("日期")
+        plt.ylabel("植被覆盖率")
+        plt.legend()
+
+        outdir = Config.mkdir(Config.attachment5_dir)
+        Config.savefig(plt, outdir, "{}".format("trend"))
+
         for idx, rows in enumerate(data5.iterrows()):
             if pd.isna(rows[1]["绿植覆盖率"]):
                 print(rows[0])
                 print(data5.loc[range(rows[0]-4, rows[0]), :].mean())
                 data5.loc[rows[0], "绿植覆盖率"]= data5.loc[range(rows[0]-4, rows[0]), "绿植覆盖率"].mean()
                 # data5.loc[rows[0], :].fillna(data5.loc[range(rows[0]-4, rows[0]), :].mean(), inplace=True)
+        # plt.figure()
+        # plt.scatter(data5["日期"], data5['绿植覆盖率'].values)
+        # plt.plot(data5["日期"], data5['绿植覆盖率'].values, 'r:')
+        # plt.title("缺失值补全后绿植覆盖率时间关系")
+        # plt.xlabel("日期")
+        # plt.ylabel("植被覆盖率")
+        # Config.savefig(plt, outdir, "{}".format("after_trend"))
+
         data5["日期"] = data5["日期"].apply(lambda x: "".join(str(x).split('-')[0:2]))
         data5 = pd.DataFrame(data5[["日期", "绿植覆盖率"]].groupby("日期").agg({"绿植覆盖率": np.mean}))
         data5.to_csv("data5.csv")
 
+        
 
 
     if Config.isAttachment6:
