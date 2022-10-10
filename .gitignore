@@ -9,3 +9,4 @@ train_data/
 *.sh
 *.zip
 /data/基本数据/附件2、锡林郭勒统计年鉴（2016-2021）
+.DS_Store
